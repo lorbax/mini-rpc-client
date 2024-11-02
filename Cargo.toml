@@ -1,0 +1,23 @@
+[package]
+name = "mini-rpc-client"
+version = "1.0.0"
+authors = ["lorenzo.bonax@gmail.com"]
+edition = "2021"
+description = "low level rpc mini-client, compatible with SV2 reference implementation"
+readme = "README.md"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitcoin = "0.32.4"
+serde = { version = "1.0.89", features = ["derive", "alloc"], default-features = false }
+serde_json = { version = "1.0", default-features = false, features = ["alloc","raw_value"] }
+hex = "0.4.3"
+base64 = "0.21.5"
+hyper = { version = "1.1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+tokio = { version = "1", features = ["full"] }
+
+
