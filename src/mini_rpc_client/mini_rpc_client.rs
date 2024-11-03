@@ -28,34 +28,15 @@ impl MiniRpcClient {
         let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
         MiniRpcClient { client, url, auth }
     }
-    
+
     pub async fn get_mempool_entry(
         &self,
         txid: &String,
     ) -> Result<GetMempoolEntryResult, RpcError> {
         // mempool inclusion is hardcoded to true, set it optional for the caller
-        let response = self
-            .send_json_rpc_request("getmempoolentry", json!([txid]))
-            .await;
-        match response {
-            Ok(result_hex) => {
-                let result_deserialized: JsonRpcResult<GetMempoolEntryResult> =
-                    serde_json::from_str(&result_hex).map_err(|e| {
-                        RpcError::Deserialization(e.to_string()) // TODO manage message ids
-                    })?;
-                if let Some(mempool_entry) = result_deserialized.result {
-                    Ok(mempool_entry)
-                } else if let Some(error) = result_deserialized.error {
-                    return Err(RpcError::JsonRpc(error));
-                } else {
-                    return Err(RpcError::ResultErrorBothNone);
-                }
-            }
-            Err(error) => {
-                dbg!(&error);
-                Err(error)
-            }
-        }
+        self.send_json_rpc_request("getmempoolentry", json!([txid]))
+            .await
+            .and_then(|result_hex| handle_result::<GetMempoolEntryResult>(result_hex.as_str()))
     }
 
     pub async fn get_tx_output(
@@ -64,28 +45,9 @@ impl MiniRpcClient {
         vout_number: u32,
     ) -> Result<GetTxOutResult, RpcError> {
         // mempool inclusion is hardcoded to true, set it optional for the caller
-        let response = self
-            .send_json_rpc_request("gettxout", json!([txid, vout_number, true]))
-            .await;
-        match response {
-            Ok(result_hex) => {
-                let result_deserialized: JsonRpcResult<GetTxOutResult> =
-                    serde_json::from_str(&result_hex).map_err(|e| {
-                        RpcError::Deserialization(e.to_string()) // TODO manage message ids
-                    })?;
-                if let Some(txout) = result_deserialized.result {
-                    Ok(txout)
-                } else if let Some(error) = result_deserialized.error {
-                    return Err(RpcError::JsonRpc(error));
-                } else {
-                    return Err(RpcError::ResultErrorBothNone);
-                }
-            }
-            Err(error) => {
-                dbg!(&error);
-                Err(error)
-            }
-        }
+        self.send_json_rpc_request("gettxout", json!([txid, vout_number, true]))
+            .await
+            .and_then(|result_hex| handle_result::<GetTxOutResult>(result_hex.as_str()))
     }
 
     // HOW TO DECODE A TRANSACTION:
@@ -101,75 +63,20 @@ impl MiniRpcClient {
         block_hash: Option<&BlockHash>,
         verbose: bool,
     ) -> Result<GetRawTransactionVerboseResult, RpcError> {
-        let response = match block_hash {
+        match block_hash {
             Some(hash) => {
                 self.send_json_rpc_request("getrawtransaction", json!([txid, verbose, hash]))
             }
             None => self.send_json_rpc_request("getrawtransaction", json!([txid, verbose])),
         }
-        .await;
-        match response {
-            Ok(result_hex) => {
-                let result_deserialized: JsonRpcResult<GetRawTransactionVerboseResult> = serde_json::from_str(&result_hex)
-                    .map_err(|e| {
-                        RpcError::Deserialization(e.to_string()) // TODO manage message ids
-                    })?;
-                result_deserialized.result.ok_or_else(|| RpcError::Other("Result not found".to_string()))
-            }
-            Err(error) => Err(error),
-        }
+        .await
+        .and_then(|result_hex| handle_result::<GetRawTransactionVerboseResult>(result_hex.as_str()))
     }
 
-    //pub async fn get_raw_transaction(
-    //    &self,
-    //    txid: &String,
-    //    block_hash: Option<&BlockHash>,
-    //) -> Result<Transaction, RpcError> {
-    //    let response = match block_hash {
-    //        Some(hash) => {
-    //            self.send_json_rpc_request("getrawtransaction", json!([txid, false, hash]))
-    //        }
-    //        None => self.send_json_rpc_request("getrawtransaction", json!([txid, false])),
-    //    }
-    //    .await;
-    //    match response {
-    //        Ok(result_hex) => {
-    //            let result_deserialized: JsonRpcResult<String> = serde_json::from_str(&result_hex)
-    //                .map_err(|e| {
-    //                    RpcError::Deserialization(e.to_string()) // TODO manage message ids
-    //                })?;
-    //            let transaction_hex: String = if let Some(hex) = result_deserialized.result {
-    //                hex
-    //            } else {
-    //                match result_deserialized.error {
-    //                    Some(error) => return Err(RpcError::JsonRpc(error)),
-    //                    None => {
-    //                        return Err(RpcError::ResultErrorBothNone);
-    //                    }
-    //                }
-    //            };
-    //            let transaction_bytes = decode(transaction_hex).expect("Decoding failed");
-    //            Ok(consensus_decode(&transaction_bytes).expect("Deserialization failed"))
-    //        }
-    //        Err(error) => Err(error),
-    //    }
-    //}
-
     pub async fn get_raw_mempool(&self) -> Result<Vec<String>, RpcError> {
-        let response = self.send_json_rpc_request("getrawmempool", json!([])).await;
-        match response {
-            Ok(result_hex) => {
-                let result_deserialized: JsonRpcResult<Vec<String>> =
-                    serde_json::from_str(&result_hex).map_err(|e| {
-                        RpcError::Deserialization(e.to_string()) // TODO manage message ids
-                    })?;
-                let mempool: Vec<String> = result_deserialized
-                    .result
-                    .ok_or_else(|| RpcError::Other("Result not found".to_string()))?;
-                Ok(mempool)
-            }
-            Err(error) => Err(error),
-        }
+        self.send_json_rpc_request("getrawmempool", json!([]))
+            .await
+            .and_then(|result_hex| handle_result::<Vec<String>>(result_hex.as_str()))
     }
 
     pub async fn submit_block(&self, block_hex: String) -> Result<(), RpcError> {
@@ -178,6 +85,7 @@ impl MiniRpcClient {
             .await;
 
         match response {
+            // do somthing better in Ok() variant
             Ok(_) => Ok(()),
             Err(error) => Err(error),
         }
@@ -238,6 +146,19 @@ impl MiniRpcClient {
         } else {
             return Err(RpcError::Http("Http reply with error status".to_string()));
         }
+    }
+}
+
+fn handle_result<'a, T: Deserialize<'a>>(result_hex: &'a str) -> Result<T, RpcError> {
+    let result_deserialized: JsonRpcResult<T> = serde_json::from_str(result_hex).map_err(|e| {
+        RpcError::Deserialization(e.to_string()) // TODO manage message ids
+    })?;
+    match result_deserialized.result {
+        Some(result) => Ok(result),
+        None => match result_deserialized.error {
+            Some(error) => Err(RpcError::JsonRpc(error)),
+            None => Err(RpcError::ResultErrorBothNone),
+        },
     }
 }
 
@@ -351,48 +272,47 @@ struct Vout {
 
 #[derive(Deserialize, Debug)]
 pub struct GetTxOutResult {
-     bestblock: String,
-     confirmations: Option<u64>,
-     value: f64,
+    bestblock: String,
+    confirmations: Option<u64>,
+    value: f64,
     #[serde(rename = "scriptPubKey")]
-     script_pub_key: ScriptPubKey,
-     coinbase: bool,
+    script_pub_key: ScriptPubKey,
+    coinbase: bool,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ScriptPubKey {
-     asm: String,
-     hex: String,
-     req_sigs: Option<u32>,
+    asm: String,
+    hex: String,
+    req_sigs: Option<u32>,
     #[serde(rename = "type")]
-     script_type: String,
-     addresses: Option<Vec<String>>,
+    script_type: String,
+    addresses: Option<Vec<String>>,
 }
-
 
 #[derive(Deserialize, Debug)]
 pub struct GetMempoolEntryResult {
-     vsize: u32,
-     weight: u32,
-     time: u64,
-     height: u64,
-     descendantcount: u32,
-     descendantsize: u32,
-     ancestorcount: u32,
-     ancestorsize: u32,
-     wtxid: String,
-     fees: Fees,
-     depends: Vec<String>,
-     spentby: Vec<String>,
+    vsize: u32,
+    weight: u32,
+    time: u64,
+    height: u64,
+    descendantcount: u32,
+    descendantsize: u32,
+    ancestorcount: u32,
+    ancestorsize: u32,
+    wtxid: String,
+    fees: Fees,
+    depends: Vec<String>,
+    spentby: Vec<String>,
     #[serde(rename = "bip125-replaceable")]
-     bip125_replaceable: bool,
-     unbroadcast: Option<bool>,
+    bip125_replaceable: bool,
+    unbroadcast: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Fees {
-     base: f64,
-     modified: f64,
-     ancestor: f64,
-     descendant: f64,
+    base: f64,
+    modified: f64,
+    ancestor: f64,
+    descendant: f64,
 }

@@ -6,7 +6,7 @@ use hex::decode;
 use tokio;
 const RPC_USER: &str = "user";
 const RPC_PASSWORD: &str = "password";
-const LOCAL_NODE: &str = "http://127.0.0.1:48333";
+const LOCAL_NODE: &str = "http://127.0.0.1:8332";
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +16,7 @@ async fn main() {
     let rpc_client = MiniRpcClient::new(LOCAL_NODE.to_string(), auth);
     let result = rpc_client
         .get_raw_transaction(
-            &"210f934de656c5338a404cb03a16b191ad81ca92d0e3365f5f518a3b6f884556".to_string(),
+            &"2a7dde6523640a8f0d01c2100e9d13a165ee7cae6fa909c945cb0aa51591fed9".to_string(),
             None,
             true,
         )
@@ -24,7 +24,8 @@ async fn main() {
     dbg!(&result);
     let transaction_hex: String = result.unwrap().hex.unwrap();
     let transaction_bytes = decode(transaction_hex).expect("Decoding failed");
-    let transaction: Transaction = consensus_decode(&transaction_bytes).expect("Deserialization failed");
+    let transaction: Transaction =
+        consensus_decode(&transaction_bytes).expect("Deserialization failed");
     dbg!(transaction);
 
     println!("Hello, world!");
