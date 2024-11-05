@@ -57,20 +57,34 @@ impl MiniRpcClient {
     //     let transaction_hex: String = result.hex.unwrap();
     //     let transaction_bytes = decode(transaction_hex).expect("Decoding failed");
     //     let transaction: Transaction = consensus_decode(&transaction_bytes).expect("Deserialization failed");
-    pub async fn get_raw_transaction(
+    pub async fn get_raw_transaction_verbose(
         &self,
         txid: &String,
-        block_hash: Option<&BlockHash>,
-        verbose: bool,
+        block_hash: Option<&str>,
     ) -> Result<GetRawTransactionVerboseResult, RpcError> {
         match block_hash {
             Some(hash) => {
-                self.send_json_rpc_request("getrawtransaction", json!([txid, verbose, hash]))
+                self.send_json_rpc_request("getrawtransaction", json!([txid, true, hash]))
             }
-            None => self.send_json_rpc_request("getrawtransaction", json!([txid, verbose])),
+            None => self.send_json_rpc_request("getrawtransaction", json!([txid, true])),
         }
         .await
         .and_then(|result_hex| handle_result::<GetRawTransactionVerboseResult>(result_hex.as_str()))
+    }
+
+    pub async fn get_raw_transaction(
+        &self,
+        txid: &String,
+        block_hash: Option<&str>,
+    ) -> Result<String, RpcError> {
+        match block_hash {
+            Some(hash) => {
+                self.send_json_rpc_request("getrawtransaction", json!([txid, false, hash]))
+            }
+            None => self.send_json_rpc_request("getrawtransaction", json!([txid, false])),
+        }
+        .await
+        .and_then(|result_hex| handle_result::<String>(result_hex.as_str()))
     }
 
     pub async fn get_raw_mempool(&self) -> Result<Vec<String>, RpcError> {
@@ -251,7 +265,7 @@ pub struct GetRawTransactionVerboseResult {
 struct Vin {
     txid: Option<String>,
     vout: Option<u32>,
-    scriptSig: Option<ScriptSig>,
+    script_sig: Option<ScriptSig>,
     sequence: u64,
     coinbase: Option<String>,
     txinwitness: Option<Vec<String>>,
